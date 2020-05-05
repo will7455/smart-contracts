@@ -629,15 +629,6 @@ contract KyberNetwork is WithdrawableNoModifiers, Utils5, IKyberNetwork, Reentra
             // notice tradeData passed by reference and updated
             destAmount = tradeData.input.maxDestAmount;
             actualSrcAmount = calcTradeSrcAmountFromDest(tradeData);
-
-            require(
-                handleChange(
-                    tradeData.input.src,
-                    tradeData.input.srcAmount,
-                    actualSrcAmount,
-                    tradeData.input.trader
-                )
-            );
         } else {
             actualSrcAmount = tradeData.input.srcAmount;
         }
@@ -663,6 +654,15 @@ contract KyberNetwork is WithdrawableNoModifiers, Utils5, IKyberNetwork, Reentra
                 tradeData.input.destAddress,
                 tradeData,
                 destAmount
+            )
+        );
+
+        require(
+            handleChange(
+                tradeData.input.src,
+                tradeData.input.srcAmount,
+                actualSrcAmount,
+                tradeData.input.trader
             )
         );
 
