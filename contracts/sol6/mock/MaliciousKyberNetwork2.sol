@@ -30,7 +30,7 @@ contract MaliciousKyberNetwork2 is KyberNetwork {
         uint256 amount,
         IERC20 dest,
         address payable destAddress,
-        TradeData memory tData,
+        ReservesData memory reservesData,
         uint256 expectedDestAmount
     ) internal override returns (bool) {
         if (src == dest) {
@@ -39,9 +39,6 @@ contract MaliciousKyberNetwork2 is KyberNetwork {
             return true;
         }
 
-        ReservesData memory reservesData = src == ETH_TOKEN_ADDRESS
-            ? tData.ethToToken
-            : tData.tokenToEth;
         uint256 callValue;
         uint256 srcAmountSoFar;
 

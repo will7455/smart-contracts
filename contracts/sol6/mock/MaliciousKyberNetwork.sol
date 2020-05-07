@@ -78,7 +78,7 @@ contract MaliciousKyberNetwork is KyberNetwork {
                 actualSrcAmount,
                 ETH_TOKEN_ADDRESS,
                 address(this),
-                tData,
+                tData.tokenToEth,
                 tData.tradeWei
             )
         ); //tData.tradeWei (expectedDestAmount) not used if destAddress == address(this)
@@ -89,7 +89,7 @@ contract MaliciousKyberNetwork is KyberNetwork {
                 tData.tradeWei - tData.networkFeeWei - tData.platformFeeWei,
                 tData.input.dest,
                 tData.input.destAddress,
-                tData,
+                tData.ethToToken,
                 destAmount
             )
         );
@@ -125,7 +125,7 @@ contract MaliciousKyberNetwork is KyberNetwork {
         uint256 amount,
         IERC20 dest,
         address payable destAddress,
-        TradeData memory tData,
+        ReservesData memory reservesData,
         uint256 expectedDestAmount
     ) internal override returns (bool) {
         if (src == dest) {
@@ -134,9 +134,6 @@ contract MaliciousKyberNetwork is KyberNetwork {
             return true;
         }
 
-        ReservesData memory reservesData = src == ETH_TOKEN_ADDRESS
-            ? tData.ethToToken
-            : tData.tokenToEth;
         uint256 callValue;
         uint256 srcAmountSoFar;
 

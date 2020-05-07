@@ -979,9 +979,12 @@ async function calcParamsFromMaxDestAmt(srcToken, destToken, unpackedOutput, inf
             tradeWeiAfterFees = maxDestAmt;
         }
 
-        unpackedOutput.tradeWei = tradeWeiAfterFees.mul(BPS).mul(BPS).div(
+        let newTradeWei = tradeWeiAfterFees.mul(BPS).mul(BPS).div(
             (BPS.mul(BPS)).sub(networkFeeBps.mul(unpackedOutput.feePayingReservesBps)).sub(platformFeeBps.mul(BPS))
         );
+        if (unpackedOutput.tradeWei.gt(newTradeWei)) {
+            unpackedOutput.tradeWei = newTradeWei;
+        }
         unpackedOutput.networkFeeWei = unpackedOutput.tradeWei.mul(networkFeeBps).div(BPS).mul(unpackedOutput.feePayingReservesBps).div(BPS);
         unpackedOutput.platformFeeWei = unpackedOutput.tradeWei.mul(platformFeeBps).div(BPS);
 
@@ -1012,7 +1015,12 @@ function calcTradeSrcAmount(srcDecimals, destDecimals, destAmt, rates, srcAmount
         let srcAmt = Helper.calcSrcQty(destAmountSplit, srcDecimals, destDecimals, rates[i]);
         if (srcAmt.gt(srcAmounts[i])) {
             srcAmt = srcAmounts[i];
-            console.log("new src amount is higher than current src amount");
+            console.log("new src amount is higher than current src amount, fallback");
+            srcAmount = new BN(0);
+            for(let j = 0; j < srcAmounts.length; j++) {
+                srcAmount = srcAmount.add(srcAmounts[i]);
+            }
+            return [srcAmount, srcAmounts];
         }
         newSrcAmounts.push(srcAmt);
         srcAmount = srcAmount.add(srcAmt);

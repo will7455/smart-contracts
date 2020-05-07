@@ -558,7 +558,7 @@ contract KyberNetwork is WithdrawableNoModifiers, Utils5, IKyberNetwork, Reentra
         uint256 amount,
         IERC20 dest,
         address payable destAddress,
-        TradeData memory tradeData,
+        ReservesData memory reservesData,
         uint256 expectedDestAmount
     ) internal virtual returns (bool) {
         amount;
@@ -571,13 +571,9 @@ contract KyberNetwork is WithdrawableNoModifiers, Utils5, IKyberNetwork, Reentra
             return true;
         }
 
-        ReservesData memory reservesData = (src == ETH_TOKEN_ADDRESS)
-            ? tradeData.ethToToken
-            : tradeData.tokenToEth;
-
-        uint256 srcDecimals = getUpdateDecimals(src);
-        uint256 destDecimals = getUpdateDecimals(dest);
         uint256 actualDestAmount;
+        uint256 srcDecimals = src == ETH_TOKEN_ADDRESS ? ETH_DECIMALS : reservesData.decimals;
+        uint256 destDecimals = src == ETH_TOKEN_ADDRESS ? reservesData.decimals : ETH_DECIMALS;
 
         for (uint256 i = 0; i < reservesData.addresses.length; i++) {
             actualDestAmount += tradeAndVerifyNetworkBalance(
@@ -705,7 +701,7 @@ contract KyberNetwork is WithdrawableNoModifiers, Utils5, IKyberNetwork, Reentra
                 actualSrcAmount,
                 ETH_TOKEN_ADDRESS,
                 address(this),
-                tradeData,
+                tradeData.tokenToEth,
                 tradeData.tradeWei
             )
         ); // tradeData.tradeWei (expectedDestAmount) not used if destAddress == address(this)
@@ -717,7 +713,7 @@ contract KyberNetwork is WithdrawableNoModifiers, Utils5, IKyberNetwork, Reentra
                 tradeData.tradeWei - tradeData.networkFeeWei - tradeData.platformFeeWei,
                 tradeData.input.dest,
                 tradeData.input.destAddress,
-                tradeData,
+                tradeData.ethToToken,
                 destAmount
             )
         );
@@ -1179,6 +1175,7 @@ contract KyberNetwork is WithdrawableNoModifiers, Utils5, IKyberNetwork, Reentra
         uint256 weiAfterFees;
         if (tradeData.input.dest != ETH_TOKEN_ADDRESS) {
             weiAfterFees = calcTradeSrcAmount(
+                tradeData.tradeWei - tradeData.platformFeeWei - tradeData.networkFeeWei,
                 ETH_DECIMALS,
                 tradeData.ethToToken.decimals,
                 tradeData.input.maxDestAmount,
@@ -1189,13 +1186,14 @@ contract KyberNetwork is WithdrawableNoModifiers, Utils5, IKyberNetwork, Reentra
         }
 
         // reverse calculation, because we are working backwards
-        tradeData.tradeWei =
+        uint256 newTradeWei =
             (weiAfterFees * BPS * BPS) /
             ((BPS * BPS) -
                 tradeData.networkFeeBps *
                 tradeData.feeAccountedBps -
                 tradeData.input.platformFeeBps *
                 BPS);
+        tradeData.tradeWei = minOf(newTradeWei, tradeData.tradeWei);
         // recalculate network and platform fees based on tradeWei
         tradeData.networkFeeWei =
             (((tradeData.tradeWei * tradeData.networkFeeBps) / BPS) * tradeData.feeAccountedBps) /
@@ -1204,6 +1202,7 @@ contract KyberNetwork is WithdrawableNoModifiers, Utils5, IKyberNetwork, Reentra
 
         if (tradeData.input.src != ETH_TOKEN_ADDRESS) {
             actualSrcAmount = calcTradeSrcAmount(
+                tradeData.input.srcAmount,
                 tradeData.tokenToEth.decimals,
                 ETH_DECIMALS,
                 tradeData.tradeWei,
@@ -1219,17 +1218,19 @@ contract KyberNetwork is WithdrawableNoModifiers, Utils5, IKyberNetwork, Reentra
     /// @notice Recalculates srcAmounts and stores into tradingReserves, given the new destAmount.
     ///     Uses the original proportion of srcAmounts and rates to determine new split destAmounts,
     ///     then calculate the respective srcAmounts
-    /// @dev Due to small rounding errors, we take the minimum of the original and new srcAmounts
+    /// @dev Due to small rounding errors, will fallback to current src amounts if new src amount is greater
     function calcTradeSrcAmount(
+        uint256 srcAmount,
         uint256 srcDecimals,
         uint256 destDecimals,
         uint256 destAmount,
         ReservesData memory reservesData
-    ) internal pure returns (uint256 srcAmount) {
+    ) internal pure returns (uint256 newSrcAmount) {
         uint256 totalWeightedDestAmount;
         for (uint256 i = 0; i < reservesData.srcAmounts.length; i++) {
             totalWeightedDestAmount += reservesData.srcAmounts[i] * reservesData.rates[i];
         }
+        uint256[] memory newSrcAmounts = new uint256[](reservesData.srcAmounts.length);
 
         uint256 destAmountSoFar;
         for (uint256 i = 0; i < reservesData.srcAmounts.length; i++) {
@@ -1240,16 +1241,20 @@ contract KyberNetwork is WithdrawableNoModifiers, Utils5, IKyberNetwork, Reentra
                     totalWeightedDestAmount;
             destAmountSoFar += destAmountSplit;
 
-            uint256 newSrcAmount = calcSrcQty(
+            newSrcAmounts[i] = calcSrcQty(
                 destAmountSplit,
                 srcDecimals,
                 destDecimals,
                 reservesData.rates[i]
             );
-            newSrcAmount = minOf(newSrcAmount, currentSrcAmount);
+            if (newSrcAmounts[i] > currentSrcAmount) {
+                // revert back to use current src amounts
+                newSrcAmount = srcAmount;
+                return newSrcAmount;
+            }
 
-            reservesData.srcAmounts[i] = newSrcAmount;
-            srcAmount += newSrcAmount;
+            newSrcAmount += newSrcAmounts[i];
         }
+        reservesData.srcAmounts = newSrcAmounts;
     }
 }
