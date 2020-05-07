@@ -9,7 +9,7 @@ import "./IKyberReserve.sol";
 interface IKyberStorage {
     enum ReserveType {NONE, FPR, APR, BRIDGE, UTILITY, CUSTOM, ORDERBOOK, LAST}
 
-    function addKyberProxy(address networkProxy, uint256 max_approved_proxies)
+    function addKyberProxy(address networkProxy, uint256 maxApprovedProxies)
         external
         returns (bool);
 

@@ -273,7 +273,7 @@ abstract contract KyberHintHandler is IKyberHint, Utils5 {
         bytes32[] memory reserveIds,
         uint256[] memory splits
     ) internal pure returns (HintErrors) {
-        if (!(reserveIds.length > 0)) return HintErrors.ReserveIdEmptyError;
+        if (reserveIds.length == 0)) return HintErrors.ReserveIdEmptyError;
         if (tradeType == TradeType.Split) {
             if (reserveIds.length != splits.length) return HintErrors.ReserveIdSplitsError;
 
